@@ -1,0 +1,10 @@
+{
+  "name": "@flakeed/google-vision",
+  "keywords": [
+    "deep-package"
+  ],
+  "version": "0.0.5",
+  "dependencies": {
+    "@deep-foundation/core": "^0.0.2"
+  }
+}
