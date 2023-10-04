@@ -1,0 +1,180 @@
+{
+  "package": {
+    "name": "@flakeed/google-vision",
+    "version": "0.0.5"
+  },
+  "data": [
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "Type"
+      },
+      "id": 1
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "User"
+      },
+      "id": 2
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "AsyncFile"
+      },
+      "id": 3
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "SyncTextFile"
+      },
+      "id": 4
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "Handler"
+      },
+      "id": 5
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "dockerSupportsJs"
+      },
+      "id": 6
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "HandleInsert"
+      },
+      "id": 7
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "Value"
+      },
+      "id": 8
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "Object"
+      },
+      "id": 9
+    },
+    {
+      "package": {
+        "dependencyId": 0,
+        "containValue": "String"
+      },
+      "id": 10
+    },
+    {
+      "id": "DetectedText",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "AsyncFileHandlerCode",
+      "type": 4,
+      "value": {
+        "value": "async ({ data: { newLink, triggeredByLinkId }, deep, require }) => {\n  const detectTextTypeLinkId = await deep.id(\"@flakeed/google-vision\", \"DetectText\");\n  const detectHandwritingTypeLinkId = await deep.id(\"@flakeed/google-vision\", \"DetectHandwriting\");\n  const detectTextInFilesTypeLinkId = await deep.id(\"@flakeed/google-vision\", \"DetectTextInFiles\");\n  const detectLabelsTypeLinkId = await deep.id(\"@flakeed/google-vision\", \"DetectLabels\");\n  const detectLogosTypeLinkId = await deep.id(\"@flakeed/google-vision\", \"DetectLogos\");\n  const axios = require(\"axios\");\n  const vision = require('@google-cloud/vision');\n  const { Storage } = require('@google-cloud/storage');\n  const fs = require('fs');\n  const os = require('os');\n  const { v4: uuid } = require('uuid');\n  let detections;\n  let detectedText='';\n\n  console.log(\"pathfile\", await getPath(deep, newLink));\n  const { tempDirectory, tempPath, fileType, fileName } = await getPath(deep, newLink);\n\n  const authFilelinkId = await deep.id(\"@flakeed/google-vision\", \"GoogleCloudAuthFile\");\n  const { data: [{ value: { value: authFile } }] } = await deep.select({ type_id: authFilelinkId });\n\n  const keyFilePath = `${tempDirectory}/key.json`;\n  fs.writeFileSync(keyFilePath, JSON.stringify(authFile));\n\n  try {\n    process.env[\"GOOGLE_APPLICATION_CREDENTIALS\"] = keyFilePath;\n    if (newLink.type_id === detectTextTypeLinkId) {\n      detectedText = await processTextDetection(tempPath);\n\n      await deep.insert({\n        type_id: await deep.id(\"@flakeed/google-vision\", \"DetectedText\"),\n        from_id: triggeredByLinkId,\n        to_id: newLink.to_id,\n        string: { data: { value: detectedText } },\n        in: {\n          data: {\n            type_id: await deep.id(\"@deep-foundation/core\", \"Contain\"),\n            from_id: triggeredByLinkId\n          }\n        }\n      });\n    } else if (newLink.type_id === detectHandwritingTypeLinkId) {\n      detectedText = await processHandwritingDetection(tempPath);\n\n      await deep.insert({\n        type_id: await deep.id(\"@flakeed/google-vision\", \"DetectedText\"),\n        from_id: triggeredByLinkId,\n        to_id: newLink.to_id,\n        string: { data: { value: detectedText.text } },\n        in: {\n          data: {\n            type_id: await deep.id(\"@deep-foundation/core\", \"Contain\"),\n            from_id: triggeredByLinkId\n          }\n        }\n      });\n    } else if (newLink.type_id === detectTextInFilesTypeLinkId) {\n      detectedText=await processTextIfFilesDetection(fileType, fileName);\n      await deep.insert({\n        type_id: await deep.id(\"@flakeed/google-vision\", \"DetectedText\"),\n        from_id: triggeredByLinkId,\n        to_id: newLink.to_id,\n        string: { data: { value: detectedText } },\n        in: {\n          data: {\n            type_id: await deep.id(\"@deep-foundation/core\", \"Contain\"),\n            from_id: triggeredByLinkId\n          }\n        }\n      });\n    } else if (newLink.type_id === detectLabelsTypeLinkId) {\n      detectedText = await proccesLabelsDetection(tempPath);\n      await deep.insert({\n        type_id: await deep.id(\"@flakeed/google-vision\", \"DetectedText\"),\n        from_id: triggeredByLinkId,\n        to_id: newLink.to_id,\n        string: { data: { value: JSON.stringify(detectedText) } },\n        in: {\n          data: {\n            type_id: await deep.id(\"@deep-foundation/core\", \"Contain\"),\n            from_id: triggeredByLinkId\n          }\n        }\n      });\n    } else if (newLink.type_id === detectLogosTypeLinkId) {\n      detectedText = await proccesLogosDetection(tempPath);\n\n      await deep.insert({\n        type_id: await deep.id(\"@flakeed/google-vision\", \"DetectedText\"),\n        from_id: triggeredByLinkId,\n        to_id: newLink.to_id,\n        string: { data: { value: JSON.stringify(detectedText) } },\n        in: {\n          data: {\n            type_id: await deep.id(\"@deep-foundation/core\", \"Contain\"),\n            from_id: triggeredByLinkId\n          }\n        }\n      });\n    } else {\n      console.error(\"Invalid type ID.\");\n    }\n  } catch (error) {\n    console.error(\"Error processing image:\", error);\n  } finally {\n    fs.rmSync(keyFilePath, { recursive: true, force: true });\n    fs.unlinkSync(tempPath);\n    fs.rmdirSync(tempDirectory);\n  }\n\n  async function processTextDetection(tempPath) {\n    const client = new vision.ImageAnnotatorClient();\n\n    const [result] = await client.textDetection(tempPath);\n    detections = result.textAnnotations;\n\n    if (detections && detections.length > 0) {\n      detectedText = detections[0].description;\n      console.log(\"Detected text from Google Vision API:\", detectedText);\n    } else {\n      console.log(\"No text detected or error in the response.\");\n    }\n    return detectedText;\n  }\n\n  async function processHandwritingDetection(tempPath) {\n    const client = new vision.ImageAnnotatorClient();\n    const [result] = await client.documentTextDetection(tempPath);\n    detectedText = result.fullTextAnnotation;\n    console.log(detectedText.text);\n    return detectedText;\n  }\n  \nasync function processTextIfFilesDetection(selectedFileType, selectedFileName) {\n  const vision = require('@google-cloud/vision').v1;\n  const client = new vision.ImageAnnotatorClient();\n  const storage = new Storage();\n  const {promisify} = require('util');\n  const glob = promisify(require('glob'));\n\n  const bucketName = 'media-handler-vision';\n  const fileName = selectedFileName;\n\n  const gcsSourceUri = `gs://${bucketName}/${fileName}`;\n  \n  const inputConfig = {\n    mimeType: selectedFileType,\n    gcsSource: {\n      uri: gcsSourceUri,\n    },\n  };\n  console.log(\"inputConfig\",inputConfig)\n  const features = [{ type: 'DOCUMENT_TEXT_DETECTION' }];\n  \n  let allResponses = [];\n\n  const pagesCount = 100; \n  const pagesPerBatch = 5; \n  const numberOfBatches = Math.ceil(pagesCount / pagesPerBatch);\n\n  for (let i = 0; i < numberOfBatches; i++) {\n    const gcsDestinationUri = `gs://${bucketName}/${selectedFileName}-output-${i}.json`;\nconsole.log(\"gcsDestinationUri\",gcsDestinationUri)\n    const outputConfig = {\n      gcsDestination: {\n        uri: gcsDestinationUri,\n      },\n    };\n    console.log(\"outputConfig\",outputConfig)\n\n    const request = {\n      requests: [\n        {\n          inputConfig: inputConfig,\n          features: features,\n          outputConfig: outputConfig,\n        },\n      ],\n    };\n    console.log(\"request\",request)\n\n    const [operation] = await client.asyncBatchAnnotateFiles(request);\n    await operation.promise();\n    console.log(\"operation\",operation)\n    await new Promise(resolve => setTimeout(resolve, 5000));\n    setTimeout(async () => {\n      const jsonFiles = await glob(`${selectedFileName}-output-${i}.json*`);\nconsole.log(\"jsonFiles\",jsonFiles)\n      await Promise.all(jsonFiles.map(async (jsonFile) => {\n        console.log(\"4\")\n        const outputFile = storage.bucket(bucketName).file(jsonFile);\n        console.log(\"outputFile\",outputFile)\n        const localOutputPath = `./${jsonFile}`;\n        await outputFile.download({ destination: localOutputPath });\n\n        const outputFileContent = await fs.promises.readFile(localOutputPath, 'utf8');\n        console.log(\"outputFileContent\",outputFileContent)\n        console.log(\"5\")\n        const outputJson = JSON.parse(outputFileContent);\n        console.log(\"outputJson\",outputJson)\n        const responses = outputJson.responses;\n        console.log(\"responses\",responses)\n        responses.forEach(response => {\n          const text = response.fullTextAnnotation.text;\n          allResponses.push(text);\n          console.log(\"3\")\n        });\n      }));\n    }, 5000);\n  }\nconsole.log(\"allResponses\",allResponses)\n  fs.writeFileSync('./allPages.json', JSON.stringify(allResponses));\n\n  return allResponses.join('');\n}\n\n\n\n\n\n  async function proccesLabelsDetection(tempPath) {\n    const client = new vision.ImageAnnotatorClient();\n    const [result] = await client.labelDetection(tempPath);\n    const labels = result.labelAnnotations;\n    console.log('Labels:');\n    labels.forEach(label => console.log(label.description));\n    detectedText = labels.map(label => label.description);\n    return detectedText;\n  }\n\n  async function proccesLogosDetection(tempPath) {\n    const client = new vision.ImageAnnotatorClient();\n    const [result] = await client.logoDetection(tempPath);\n    const logos = result.logoAnnotations;\n    console.log('Logos:');\n    logos.forEach(logo => console.log(logo));\n    detectedText = logos.map(logo => logo.description);\n    return detectedText;\n  }\n\n  async function getPath(deep, link) {\n    const ssl = deep.apolloClient.ssl;\n    const path = deep.apolloClient.path.slice(0, -4);\n    console.log(\"url\", `${ssl ? \"https://\" : \"http://\"}${path}/file?linkId=${link.to_id}`);\n    const url = `${ssl ? \"https://\" : \"http://\"}${path}/file?linkId=${link.to_id}`;\n\n    const { data } = await axios({\n      method: 'get',\n      url,\n      headers: {\n        'Authorization': `Bearer ${deep.token}`\n      },\n      responseType: \"arraybuffer\",\n    });\n    console.log(\"link_id:\", link.to_id);\n\n    const baseTempDirectory = os.tmpdir();\n    const randomId = uuid();\n    const tempDirectory = [baseTempDirectory, randomId].join('/');\n    fs.mkdirSync(tempDirectory);\n\n    const fileNameSelect = await deep.select(\n      {\n        link_id: {\n          _eq: link.to_id\n        }\n      },\n      {\n        table: 'files',\n        returning: `link_id name mimeType`\n      });\n    console.log(\"fileNameSelect:\", fileNameSelect);\n    const fileName = fileNameSelect.data[0].name;\n    const fileType = fileNameSelect.data[0].mimeType;\n    const imageBuffer = Buffer.from(data, 'binary');\n    const tempPath = `${tempDirectory}/${fileName}`;\n    fs.writeFileSync(tempPath, imageBuffer);\n\n    return { tempDirectory, tempPath, fileType, fileName };\n  }\n\n  return detectedText;\n}"
+      }
+    },
+    {
+      "id": "AsyncFileHandler",
+      "type": 5,
+      "from": 6,
+      "to": "AsyncFileHandlerCode"
+    },
+    {
+      "id": "DetectLogos",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "HandleAsyncFileDetectLogos",
+      "type": 7,
+      "from": "DetectLogos",
+      "to": "AsyncFileHandler"
+    },
+    {
+      "id": "DetectLabels",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "HandleAsyncFileDetectLabels",
+      "type": 7,
+      "from": "DetectLabels",
+      "to": "AsyncFileHandler"
+    },
+    {
+      "id": "DetectTextInFiles",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "HandleAsyncFileDetectTextInFiles",
+      "type": 7,
+      "from": "DetectTextInFiles",
+      "to": "AsyncFileHandler"
+    },
+    {
+      "id": "DetectHandwriting",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "HandleAsyncFileDetectHandwriting",
+      "type": 7,
+      "from": "DetectHandwriting",
+      "to": "AsyncFileHandler"
+    },
+    {
+      "id": "DetectText",
+      "type": 1,
+      "from": 2,
+      "to": 3
+    },
+    {
+      "id": "HandleAsyncFileDetectText",
+      "type": 7,
+      "from": "DetectText",
+      "to": "AsyncFileHandler"
+    },
+    {
+      "id": "GoogleCloudAuthFile",
+      "type": 1
+    },
+    {
+      "id": "GoogleCloudAuthFileValue",
+      "type": 8,
+      "from": "GoogleCloudAuthFile",
+      "to": 9
+    },
+    {
+      "id": "DetectedTextValue",
+      "type": 8,
+      "from": "DetectedText",
+      "to": 10
+    }
+  ],
+  "errors": [],
+  "dependencies": [
+    {
+      "name": "@deep-foundation/core",
+      "version": "0.0.2"
+    }
+  ]
+}
